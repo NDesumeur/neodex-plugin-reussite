@@ -1,0 +1,22 @@
+{
+  "id": "neodex.reussite",
+  "name": "Réussite",
+  "version": "1.0.0",
+  "author": "NDesumeur",
+  "description": "Le solitaire classique : monter les quatre familles de l'As au Roi, avec des colonnes en ordre décroissant et des couleurs alternées.",
+  "icon": "icon.png",
+  "entry": "index.js",
+  "view": "reussite",
+  "neobase": ">=4.0.0",
+  "type": "app",
+  "category": "Jeux",
+  "syncMode": "progression",
+  "syncInfo": "Réussites, meilleur temps.",
+  "mobile": false,
+  "system": false,
+  "dependencies": {},
+  "sdk": "2.1.0",
+  "permissions": [
+    "storage"
+  ]
+}
