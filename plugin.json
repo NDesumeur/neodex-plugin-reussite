@@ -3,7 +3,7 @@
   "name": "Réussite",
   "version": "1.0.0",
   "author": "NDesumeur",
-  "description": "Le solitaire classique : monter les quatre familles de l'As au Roi, avec des colonnes en ordre décroissant et des couleurs alternées.",
+  "description": "Le solitaire classique (Klondike) : range les 52 cartes dans les quatre familles de l'As au Roi en les déplaçant entre sept colonnes, par ordre décroissant et couleurs alternées. Glisse les cartes ou clique pour les envoyer à la meilleure place, pioche une ou trois cartes, annule sans limite ; fin automatique, temps, coups et meilleur temps gardés.",
   "icon": "icon.png",
   "entry": "index.js",
   "view": "reussite",
