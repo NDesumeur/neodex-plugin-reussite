@@ -1,9 +1,9 @@
 {
   "pluginId": "neodex.reussite",
   "repo": "NDesumeur/neodex-plugin-reussite",
-  "version": "1.0.0",
-  "sha256": "2bba8b8c3e26802f1792f18621ddaa3227661b46d92d6d20af6406da2a65a150",
-  "approvedAt": "2026-11-07T17:30:59.706Z",
+  "version": "1.0.1",
+  "sha256": "20b9057fd8c2c288fa2fc084ed34aed913f6eaea31d090d30b5e8a7f24e8e251",
+  "approvedAt": "2026-11-08T12:10:50.069Z",
   "neobase": ">=4.0.0",
-  "signature": "aZIndkAETfmQJJqk2lnP+pmquRSiPHzxGMaxNRAiROdQLpnBWrtotadufJ08p/j5ptcLNH91EcMCDgFmH5bMAg=="
+  "signature": "6T0vqD4SEm7Ot8KVoqaVNzIY34u60GrqyXx1un+h1ErHpM7pWJEaQYytVI8VRYNmFxlKTzBgCWFQxaTW6v82DQ=="
 }
