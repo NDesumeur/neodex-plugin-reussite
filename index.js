@@ -5,19 +5,21 @@ const HTML = `<div class="appWrap wide">
   <div class="gMain"><div class="gameBox"><canvas id="gc" width="320" height="256"></canvas></div>
     <div class="gSide">
       <div class="sysCard"><b>RECORDS</b><div class="gStats" id="gStats"></div></div>
-      <div class="row"><button class="btn main" id="gNew">NOUVELLE PARTIE</button><button class="btn" id="rsUndo">ANNULER</button></div>
+      <div class="row"><button class="btn main" id="gNew">NOUVELLE PARTIE</button><button class="btn" id="rsFs">PLEIN ÉCRAN</button><button class="btn" id="rsUndo">ANNULER</button></div>
       <label class="row"><input type="checkbox" id="rsDraw3"> Piocher 3 cartes à la fois</label>
       <div class="hint">Colonnes : une carte se pose sur une carte d'une unité plus forte et de l'autre couleur (un 7 rouge sur un 8 noir). Une colonne vide n'accepte qu'un Roi.</div><div class="hint">Familles (en haut à droite) : de l'As au Roi, dans la même couleur. Quand tout est découvert, le jeu termine tout seul.</div>
     </div></div>
 </div>`;
 const CSS = `.gMain{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
-.gameBox{display:grid;place-items:center;padding:10px;background:#05010b;flex:2;min-width:320px;position:relative}
-.gameBox canvas{width:100%;image-rendering:pixelated;cursor:var(--cp,pointer);touch-action:none}
+.gameBox{display:grid;place-items:center;padding:10px;background:#05010b;flex:2 1 480px;min-width:min(100%,320px);position:relative}
+.gameBox:fullscreen{padding:0}
+.gameBox:fullscreen canvas{width:min(100vw,calc(100vh * 320 / 256));max-width:none}
+.gameBox canvas{image-rendering:pixelated;cursor:var(--cp,pointer);touch-action:none}
 .gSide{display:flex;flex-direction:column;gap:14px;flex:1;min-width:250px;max-width:420px}
 .gSide .sysCard{display:flex;flex-direction:column}
 .gStats{display:grid;grid-template-columns:1fr auto;gap:4px 14px}
 .gStats b{text-align:right}
-.gameBox canvas{max-width:640px;aspect-ratio:320/256}`;
+.gameBox canvas{width:min(100%,max(280px,calc((100vh - 170px) * 320 / 256)));height:auto;aspect-ratio:320/256}`;
 /* ---------- l'habillage pixel art, dessiné à la main : police bitmap (accents compris), cadres, boutons, icônes ----------
    Tout est en pixels pleins, agrandis par 2 sans lissage : aucun dégradé, aucune ombre floue. */
 const PXK = (() => {
@@ -289,7 +291,7 @@ export default async function (ctx) {
   view.innerHTML = HTML;
   pxSkin(view.querySelector('.appWrap'), { title: "RÉUSSITE", T: {"k": "#030c08", "k2": "#082014", "fill": "#0e3020", "fillOn": "#14402a", "hl": "#1a4a32", "line": "#2e7050", "acc": "#ffd84a", "accL": "#fff4b0", "accS": "#c49a1a", "accD": "#4a3a06", "rivet": "#fff4b0", "btn": "#1a4a32", "btnHi": "#4a9a6a", "btnLo": "#082014", "btnHov": "#1e5a3a", "btnHovHi": "#6aba8a", "text": "#f0fff4", "muted": "#a8d8b8", "acc2": "#ff4a5a", "gold": "#ffd84a", "orange": "#ffa030", "red": "#ff4a5a", "green": "#7ee07a", "green2": "#2f8a3a", "bg": "#05140c", "bgDot": "#0e3020", "bgDot2": "#082014", "spark": "#2e7050", "spark2": "#ff4a5a", "tile": ["................", "...:............", "................", "..........+.....", "................", "................", ".....:..........", "................", "................", ".............:..", "................", "..+.............", "................", ".........:......", "................", "................"]},
   emblem: ["..kkkkkkk...", "..kwwwwwk...", "kkkkkkkwk...", "kwwwwwkwk...", "kwrwrwkwk...", "kwrrrwkwk...", "kwrrrwkwk...", "kwwrwwkwk...", "kwwwwwkkk...", "kwwwwwk.....", "kkkkkkk.....", "............"],
-  icons: [[/^NOUVELLE/, "play"], [/^RECORDS/, "crown"]] });
+  icons: [[/^NOUVELLE/, "play"], [/^RECORDS/, "crown"], [/^PLEIN/, "full"]] });
   const $ = id => view.querySelector('#' + id) || document.getElementById(id);
   const doc = async n => { try { return await folder.read(n); } catch { return null; } };
   const games = { best: {}, ...(await doc('games')) };
@@ -446,6 +448,7 @@ $('gNew').onclick = () => { rss.games++; saveGames(); rsNew(); $('gNew').blur();
   console.assert(all.length === 52 && ids.size === 52 && rs.tab.flat().length === 28 && rsCanFound({s: 2, r: 0}, []) && !rsCanFound({s: 2, r: 1}, []) && rsCanTab({s: 0, r: 5}, [{s: 2, r: 6, up: true}]) && !rsCanTab({s: 0, r: 5}, [{s: 1, r: 6, up: true}]) && rsCanTab({s: 3, r: 12}, []), 'réussite');
   rs = keep;
 }
+$('rsFs').onclick = () => { $('rsFs').blur(); try { document.fullscreenElement ? document.exitFullscreen() : cv.parentElement.requestFullscreen?.().catch(() => {}); } catch {} };
 ctx.onOpen(() => { if (!rs) rsNew(); gameLoop(rs, 'reussite', () => {}, rsDraw); rsInfo(); });
 
 }
