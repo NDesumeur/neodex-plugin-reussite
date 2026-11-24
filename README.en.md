@@ -4,6 +4,10 @@ Classic solitaire (Klondike): sort the 52 cards into the four foundations, from 
 
 *Version française : [README.md](README.md)*
 
+## FreeCell and Spider (new in 1.2.0)
+
+Two new solitaires next to Klondike: FreeCell (8 columns, 4 free cells) and Spider with one or two suits, each with its own records. When you win, the cards bounce away.
+
 ## Setup
 
 - Seven **columns** of 1 to 7 cards; only the last card of each is face up.

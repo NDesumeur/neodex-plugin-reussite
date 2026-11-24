@@ -1,16 +1,19 @@
 {
   "id": "neodex.reussite",
   "name": "Réussite",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "author": "NDesumeur",
-  "description": "Le solitaire classique (Klondike) : range les 52 cartes dans les quatre familles de l'As au Roi en les déplaçant entre sept colonnes, par ordre décroissant et couleurs alternées. Glisse les cartes ou clique pour les envoyer à la meilleure place, pioche une ou trois cartes, annule sans limite ; fin automatique, temps, coups et meilleur temps gardés. Un bouton met le jeu en plein écran, et la table grandit avec la fenêtre.",
+  "description": "Le solitaire classique (Klondike) : range les 52 cartes dans les quatre familles de l'As au Roi en les déplaçant entre sept colonnes, par ordre décroissant et couleurs alternées. Glisse les cartes ou clique pour les envoyer à la meilleure place, pioche une ou trois cartes, annule sans limite ; fin automatique, temps, coups et meilleur temps gardés. Un bouton met le jeu en plein écran, et la table grandit avec la fenêtre. Aussi FreeCell et Spider (une ou deux couleurs), et les cartes qui rebondissent à la victoire.",
   "icon": "icon.png",
   "entry": "index.js",
   "view": "reussite",
   "neobase": ">=4.0.0",
   "type": "app",
   "category": "Jeux",
-  "compatibility": ["windows", "linux"],
+  "compatibility": [
+    "windows",
+    "linux"
+  ],
   "syncMode": "aucune",
   "syncInfo": "Rien n'est synchronisé : tes records restent sur cet appareil.",
   "mobile": false,

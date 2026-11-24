@@ -6,8 +6,9 @@ const HTML = `<div class="appWrap wide">
     <div class="gSide">
       <div class="sysCard"><b>RECORDS</b><div class="gStats" id="gStats"></div></div>
       <div class="row"><button class="btn main" id="gNew">NOUVELLE PARTIE</button><button class="btn" id="rsFs">PLEIN ÉCRAN</button><button class="btn" id="rsUndo">ANNULER</button></div>
-      <label class="row"><input type="checkbox" id="rsDraw3"> Piocher 3 cartes à la fois</label>
-      <div class="hint">Colonnes : une carte se pose sur une carte d'une unité plus forte et de l'autre couleur (un 7 rouge sur un 8 noir). Une colonne vide n'accepte qu'un Roi.</div><div class="hint">Familles (en haut à droite) : de l'As au Roi, dans la même couleur. Quand tout est découvert, le jeu termine tout seul.</div>
+      <label class="row">Réussite <select id="rsVar" class="f"><option value="k">Klondike</option><option value="fc">FreeCell</option><option value="s1">Spider (une couleur)</option><option value="s2">Spider (deux couleurs)</option></select></label>
+      <label class="row" id="rsDraw3Row"><input type="checkbox" id="rsDraw3"> Piocher 3 cartes à la fois</label>
+      <div class="hint" id="rsRules"></div>
     </div></div>
 </div>`;
 const CSS = `.gMain{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
@@ -360,77 +361,147 @@ const RS_BACK = cnv(RS.CW, RS.CH, b => {
   px(b, '#ffd84a', 13, 18, 4, 4); px(b, '#05010b', 14, 19, 2, 2);
 });
 const RS_SLOT = cnv(RS.CW, RS.CH, b => { for (let x = 1; x < RS.CW - 1; x += 2) { px(b, '#0e4a2c', x, 0); px(b, '#0e4a2c', x, RS.CH - 1); } for (let y = 1; y < RS.CH - 1; y += 2) { px(b, '#0e4a2c', 0, y); px(b, '#0e4a2c', RS.CW - 1, y); } });
-const rss = gstore('reussite', {games: 0, wins: 0, bestTime: 0, draw3: false});
+const rss = gstore('reussite', {games: 0, wins: 0, bestTime: 0, draw3: false}); rss.v ??= 'k'; rss.sv ??= {};
+// trois réussites : le Klondike (k), FreeCell (fc : 8 colonnes, 4 cases libres, tout est visible) et Spider (s1 / s2 : 10 colonnes, deux jeux, une ou deux couleurs)
+const RS_V = {k: {cols: 7, dx: 44, x0: 8, name: 'Klondike'}, fc: {cols: 8, dx: 38, x0: 8, name: 'FreeCell'}, s1: {cols: 10, dx: 31, x0: 5, name: 'Spider (une couleur)'}, s2: {cols: 10, dx: 31, x0: 5, name: 'Spider (deux couleurs)'}};
+const rsSpider = () => rss.v === 's1' || rss.v === 's2';
+const rsG = () => RS_V[rss.v] || RS_V.k, rsX = i => rsG().x0 + i * rsG().dx;
+const rsStat = () => rss.v === 'k' ? rss : (rss.sv[rss.v] ??= {games: 0, wins: 0, bestTime: 0});
 let rs = null;
+function rsShuffle(deck) { for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; } return deck; }
 function rsNew() {
-  const deck = []; for (let s = 0; s < 4; s++) for (let r = 0; r < 13; r++) deck.push({s, r, up: false});
-  for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
-  const tab = [...Array(7)].map((_, i) => deck.splice(0, i + 1)); tab.forEach(c => c[c.length - 1].up = true);
-  rs = Object.assign(rs || {tick: 0, raf: 0}, {mode: 'play', stock: deck, waste: [], found: [[], [], [], []], tab, hist: [], moves: 0, t0: Date.now(), time: 0, drag: null, wonAt: 0, auto: 0}); rsInfo();
+  const v = rss.v, base = {mode: 'play', stock: [], waste: [], found: [[], [], [], []], cells: [null, null, null, null], done: [], hist: [], moves: 0, t0: Date.now(), time: 0, drag: null, wonAt: 0, auto: 0, bounce: null, trail: null};
+  let tab;
+  if (v === 'fc') { const deck = rsShuffle([0, 1, 2, 3].flatMap(s => RS_RANK.map((_, r) => ({s, r, up: true})))); tab = [...Array(8)].map(() => []); deck.forEach((c, i) => tab[i % 8].push(c)); }
+  else if (v === 's1' || v === 's2') {
+    const suits = v === 's1' ? [2] : [2, 0], deck = rsShuffle([...Array(8)].flatMap((_, k) => RS_RANK.map((_, r) => ({s: suits[k % suits.length], r, up: false}))));
+    tab = [...Array(10)].map((_, i) => deck.splice(0, i < 4 ? 6 : 5)); tab.forEach(c => c[c.length - 1].up = true); base.stock = deck;
+  } else {
+    const deck = rsShuffle([0, 1, 2, 3].flatMap(s => RS_RANK.map((_, r) => ({s, r, up: false}))));
+    tab = [...Array(7)].map((_, i) => deck.splice(0, i + 1)); tab.forEach(c => c[c.length - 1].up = true); base.stock = deck;
+  }
+  rs = Object.assign(rs || {tick: 0, raf: 0}, base, {tab}); rsInfo();
 }
-const rsSnap = () => JSON.stringify({stock: rs.stock, waste: rs.waste, found: rs.found, tab: rs.tab, moves: rs.moves});
+const rsSnap = () => JSON.stringify({stock: rs.stock, waste: rs.waste, found: rs.found, cells: rs.cells, done: rs.done, tab: rs.tab, moves: rs.moves});
 function rsUndo() { const h = rs.hist.pop(); if (!h || rs.mode !== 'play') return; Object.assign(rs, JSON.parse(h)); beep(330, .04); }
 const rsCanFound = (c, f) => f.length ? f[f.length - 1].s === c.s && f[f.length - 1].r === c.r - 1 : c.r === 0;
 const rsCanTab = (c, col) => col.length ? col[col.length - 1].up && rsRed(col[col.length - 1].s) !== rsRed(c.s) && col[col.length - 1].r === c.r + 1 : c.r === 12;
+// une pile qu'on peut déplacer d'un bloc : au Klondike toutes les cartes visibles, à FreeCell en couleurs alternées, à Spider dans la même couleur
+const rsRun = cards => cards.every((c, k) => c.up && (k === 0 || (rsSpider() ? c.s === cards[k - 1].s : rsRed(c.s) !== rsRed(cards[k - 1].s)) && c.r === cards[k - 1].r - 1)) || rss.v === 'k' && cards.every(c => c.up);
+const rsFcMax = toEmpty => (rs.cells.filter(c => !c).length + 1) * 2 ** Math.max(0, rs.tab.filter(c => !c.length).length - (toEmpty ? 1 : 0));  // FreeCell : combien de cartes d'un coup, avec les cases et colonnes libres
+function rsFits(cards, to) {  // la pile peut-elle aller là ?
+  const c = cards[0];
+  if (to.kind === 'found') return rss.v !== 's1' && rss.v !== 's2' && cards.length === 1 && rsCanFound(c, rs.found[to.i]);
+  if (to.kind === 'cell') return rss.v === 'fc' && cards.length === 1 && !rs.cells[to.i];
+  const col = rs.tab[to.i], top = col[col.length - 1];
+  if (rss.v === 'k') return rsCanTab(c, col);
+  if (rss.v === 'fc') return cards.length <= rsFcMax(!col.length) && (!top || rsRed(top.s) !== rsRed(c.s) && top.r === c.r + 1);
+  return !top || top.up && top.r === c.r + 1;
+}
 function rsAfter() {
-  for (const col of rs.tab) if (col.length && !col[col.length - 1].up) col[col.length - 1].up = true;
-  if (rs.found.every(f => f.length === 13)) { rs.mode = 'won'; rs.wonAt = rs.tick; rs.time = Math.round((Date.now() - rs.t0) / 1000); rss.wins++; if (!rss.bestTime || rs.time < rss.bestTime) rss.bestTime = rs.time; saveGames(); rsInfo(); [523, 659, 784, 1047, 1319].forEach((f, k) => setTimeout(() => beep(f, .16, 'triangle'), k * 100)); }
+  if (rss.v !== 'fc') for (const col of rs.tab) if (col.length && !col[col.length - 1].up) col[col.length - 1].up = true;
+  if (rsSpider()) for (const col of rs.tab) {  // Spider : une suite complète du Roi à l'As, dans la même couleur, s'en va
+    const run = col.slice(-13); if (run.length === 13 && run[0].r === 12 && rsRun(run)) { col.splice(-13); rs.done.push(run[0].s); if (col.length) col[col.length - 1].up = true; [660, 880, 1100].forEach((f, k) => setTimeout(() => beep(f, .08, 'triangle'), k * 70)); }
+  }
+  if (rsSpider() ? rs.done.length === 8 : rs.found.every(f => f.length === 13)) {
+    const S = rsStat(); rs.mode = 'won'; rs.wonAt = rs.tick; rs.time = Math.round((Date.now() - rs.t0) / 1000); S.wins++; if (!S.bestTime || rs.time < S.bestTime) S.bestTime = rs.time; saveGames(); rsInfo(); [523, 659, 784, 1047, 1319].forEach((f, k) => setTimeout(() => beep(f, .16, 'triangle'), k * 100));
+    rs.bounce = [];  // les cartes qui rebondissent, l'une après l'autre
+  }
 }
 function rsStock() {
+  if (rsSpider()) {  // une carte sur chaque colonne ; toutes doivent être occupées
+    if (!rs.stock.length) return beep(140, .05);
+    if (rs.tab.some(c => !c.length)) { toast('Remplis d’abord les colonnes vides'); return beep(140, .05); }
+    rs.hist.push(rsSnap()); rs.moves++; for (const col of rs.tab) { const c = rs.stock.pop(); c.up = true; col.push(c); } beep(500, .05, 'square', 0, .04); rsAfter(); return;
+  }
   rs.hist.push(rsSnap()); rs.moves++;
   if (rs.stock.length) { for (let k = 0; k < (rss.draw3 ? 3 : 1) && rs.stock.length; k++) { const c = rs.stock.pop(); c.up = true; rs.waste.push(c); } beep(500, .03, 'square', 0, .04); }
   else { rs.stock = rs.waste.reverse().map(c => ({...c, up: false})); rs.waste = []; beep(250, .06, 'square', 0, .04); }
 }
-function rsPlace(cards, from, to) {  // pose une pile (d'une seule carte pour une famille) ; rend vrai si le coup est permis
-  const c = cards[0];
-  if (to.kind === 'found') { if (cards.length !== 1 || !rsCanFound(c, rs.found[to.i])) return false; }
-  else if (!rsCanTab(c, rs.tab[to.i])) return false;
+function rsPlace(cards, from, to) {  // pose une pile ; rend vrai si le coup est permis
+  if (!rsFits(cards, to)) return false;
   rs.hist.push(rsSnap()); rs.moves++;
-  const src = from.kind === 'waste' ? rs.waste : from.kind === 'found' ? rs.found[from.i] : rs.tab[from.i]; src.splice(src.length - cards.length, cards.length);
-  (to.kind === 'found' ? rs.found[to.i] : rs.tab[to.i]).push(...cards); beep(to.kind === 'found' ? 880 : 620, .04, 'triangle', 0, .05); rsAfter(); return true;
+  if (from.kind === 'cell') rs.cells[from.i] = null; else { const src = from.kind === 'waste' ? rs.waste : from.kind === 'found' ? rs.found[from.i] : rs.tab[from.i]; src.splice(src.length - cards.length, cards.length); }
+  if (to.kind === 'cell') rs.cells[to.i] = cards[0]; else (to.kind === 'found' ? rs.found[to.i] : rs.tab[to.i]).push(...cards);
+  beep(to.kind === 'found' ? 880 : 620, .04, 'triangle', 0, .05); rsAfter(); return true;
 }
-function rsAutoMove(cards, from) {  // un simple clic : vers une famille si possible, sinon vers la première colonne qui accepte
-  if (cards.length === 1) for (let i = 0; i < 4; i++) if (rsCanFound(cards[0], rs.found[i]) && rsPlace(cards, from, {kind: 'found', i})) return true;
-  for (let i = 0; i < 7; i++) if (!(from.kind === 'tab' && from.i === i) && rsCanTab(cards[0], rs.tab[i]) && rsPlace(cards, from, {kind: 'tab', i})) return true;
+function rsAutoMove(cards, from) {  // un simple clic : la meilleure place
+  if (cards.length === 1 && !rsSpider()) for (let i = 0; i < 4; i++) if (rsCanFound(cards[0], rs.found[i]) && rsPlace(cards, from, {kind: 'found', i})) return true;
+  const n = rs.tab.length, others = [...Array(n).keys()].filter(i => !(from.kind === 'tab' && from.i === i));
+  if (rsSpider()) for (const i of others) { const t = rs.tab[i].at(-1); if (t && t.s === cards[0].s && rsPlace(cards, from, {kind: 'tab', i})) return true; }  // Spider : de préférence sur la même couleur
+  for (const i of others) if (rs.tab[i].length && rsPlace(cards, from, {kind: 'tab', i})) return true;
+  for (const i of others) if (!rs.tab[i].length && rsPlace(cards, from, {kind: 'tab', i})) return true;
+  if (rss.v === 'fc' && from.kind !== 'cell' && cards.length === 1) for (let i = 0; i < 4; i++) if (rsPlace(cards, from, {kind: 'cell', i})) return true;
   return false;
 }
-const rsOff = col => { const down = col.filter(c => !c.up).length, up = col.length - down, room = H - RS.TAB - RS.CH - 4 - down * 5; return [5, up > 1 ? Math.min(12, Math.floor(room / (up - 1))) : 12]; };
+const rsOff = col => { const down = col.filter(c => !c.up).length, up = col.length - down, room = H - RS.TAB - RS.CH - 10 - down * 5; return [5, up > 1 ? Math.max(4, Math.min(12, Math.floor(room / (up - 1)))) : 12]; };
 const rsColY = (col, k) => { const [d, u] = rsOff(col); let y = RS.TAB; for (let i = 0; i < k; i++) y += col[i].up ? u : d; return y; };
 function rsPick(x, y) {  // la carte (ou la pile) sous le pointeur
+  const W1 = RS.CW, v = rss.v;
   if (y >= RS.TOP && y < RS.TOP + RS.CH) {
-    if (x >= RS.X0 && x < RS.X0 + RS.CW) return {kind: 'stock'};
-    const wx = RS.X0 + RS.DX + Math.max(0, Math.min(2, rs.waste.length - 1)) * (rss.draw3 ? 6 : 0); if (x >= RS.X0 + RS.DX && x < wx + RS.CW && rs.waste.length) return {kind: 'waste', cards: rs.waste.slice(-1)};
-    for (let i = 0; i < 4; i++) { const fx = RS.X0 + (3 + i) * RS.DX; if (x >= fx && x < fx + RS.CW && rs.found[i].length) return {kind: 'found', i, cards: rs.found[i].slice(-1)}; }
+    const hit = i => x >= rsX(i) && x < rsX(i) + W1;
+    if (v === 'fc') { for (let i = 0; i < 4; i++) if (hit(i) && rs.cells[i]) return {kind: 'cell', i, cards: [rs.cells[i]]}; for (let i = 0; i < 4; i++) if (hit(4 + i) && rs.found[i].length) return {kind: 'found', i, cards: rs.found[i].slice(-1)}; return null; }
+    if (hit(0)) return {kind: 'stock'};
+    if (rsSpider()) return null;
+    const wx = rsX(1) + Math.max(0, Math.min(2, rs.waste.length - 1)) * (rss.draw3 ? 6 : 0); if (x >= rsX(1) && x < wx + W1 && rs.waste.length) return {kind: 'waste', cards: rs.waste.slice(-1)};
+    for (let i = 0; i < 4; i++) if (hit(3 + i) && rs.found[i].length) return {kind: 'found', i, cards: rs.found[i].slice(-1)};
   }
-  for (let i = 0; i < 7; i++) { const cx = RS.X0 + i * RS.DX; if (x < cx || x >= cx + RS.CW) continue; const col = rs.tab[i];
-    for (let k = col.length - 1; k >= 0; k--) { const cy = rsColY(col, k); if (y >= cy && y < cy + RS.CH) return col[k].up ? {kind: 'tab', i, cards: col.slice(k)} : null; } }
+  for (let i = 0; i < rs.tab.length; i++) { const cx = rsX(i); if (x < cx || x >= cx + W1) continue; const col = rs.tab[i];
+    for (let k = col.length - 1; k >= 0; k--) { const cy = rsColY(col, k); if (y >= cy && y < cy + RS.CH) { const cards = col.slice(k); return col[k].up && rsRun(cards) ? {kind: 'tab', i, cards} : null; } } }
   return null;
 }
 function rsDrop(x, y) {
-  for (let i = 0; i < 4; i++) { const fx = RS.X0 + (3 + i) * RS.DX; if (x >= fx - 6 && x < fx + RS.CW + 6 && y < RS.TOP + RS.CH + 8) return {kind: 'found', i}; }
-  for (let i = 0; i < 7; i++) { const cx = RS.X0 + i * RS.DX; if (x >= cx - 6 && x < cx + RS.CW + 6 && y >= RS.TAB - 8) return {kind: 'tab', i}; }
+  const near = i => x >= rsX(i) - 6 && x < rsX(i) + RS.CW + 6;
+  if (y < RS.TOP + RS.CH + 8) {
+    if (rss.v === 'fc') { for (let i = 0; i < 4; i++) if (near(i)) return {kind: 'cell', i}; for (let i = 0; i < 4; i++) if (near(4 + i)) return {kind: 'found', i}; }
+    else if (rss.v === 'k') for (let i = 0; i < 4; i++) if (near(3 + i)) return {kind: 'found', i};
+  }
+  for (let i = 0; i < rs.tab.length; i++) if (near(i) && y >= RS.TAB - 8) return {kind: 'tab', i};
   return null;
 }
 const RS_BG = cnv(W, H, b => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) px(b, (x * 5 + y * 3) % 11 === 0 ? '#1c7a4a' : (x + y) % 2 ? '#14643c' : '#156a3e', x, y); });
+const rsSorted = col => col.every((c, k) => k === 0 || c.r < col[k - 1].r);  // FreeCell : une colonne déjà rangée en descendant
 function rsDraw() {
-  if (rs.mode === 'play' && !rs.drag && !rs.stock.length && !rs.waste.length && rs.tab.every(c => c.every(k => k.up)) && rs.tick % 6 === 0) {  // tout est découvert : on finit tout seul
-    for (let i = 0; i < 7 && rs.mode === 'play'; i++) { const col = rs.tab[i]; if (col.length && rsAutoMove(col.slice(-1), {kind: 'tab', i})) break; }
+  const v = rss.v;
+  if (rs.mode === 'play' && !rs.drag && rs.tick % 6 === 0 && (v === 'k' ? !rs.stock.length && !rs.waste.length && rs.tab.every(c => c.every(k => k.up)) : v === 'fc' && rs.tab.every(rsSorted))) {  // la fin est jouée d'avance : on finit tout seul
+    let moved = false;
+    if (v === 'fc') for (let i = 0; i < 4 && !moved; i++) if (rs.cells[i]) for (let f = 0; f < 4 && !moved; f++) if (rsCanFound(rs.cells[i], rs.found[f])) moved = rsPlace([rs.cells[i]], {kind: 'cell', i}, {kind: 'found', i: f});
+    for (let i = 0; i < rs.tab.length && !moved && rs.mode === 'play'; i++) { const col = rs.tab[i]; if (col.length) for (let f = 0; f < 4 && !moved; f++) if (rsCanFound(col.at(-1), rs.found[f])) moved = rsPlace(col.slice(-1), {kind: 'tab', i}, {kind: 'found', i: f}); }
   }
   g.drawImage(RS_BG, 0, 0);
-  g.drawImage(rs.stock.length ? RS_BACK : RS_SLOT, RS.X0, RS.TOP); if (!rs.stock.length) { px(g, '#0e4a2c', RS.X0 + 11, RS.TOP + 16, 8, 8); px(g, '#156a3e', RS.X0 + 13, RS.TOP + 18, 4, 4); }
   const dragging = rs.drag && rs.drag.moved ? rs.drag : null, hidden = c => dragging && dragging.cards.includes(c);
-  const ws = rs.waste.slice(rss.draw3 ? -3 : -1); ws.forEach((c, k) => { if (!hidden(c)) g.drawImage(RS_FACES[c.s][c.r], RS.X0 + RS.DX + k * (rss.draw3 ? 6 : 0), RS.TOP); });
-  for (let i = 0; i < 4; i++) { const f = rs.found[i], x = RS.X0 + (3 + i) * RS.DX; g.drawImage(RS_SLOT, x, RS.TOP); const top = f.length && hidden(f[f.length - 1]) ? f[f.length - 2] : f[f.length - 1]; if (top) g.drawImage(RS_FACES[top.s][top.r], x, RS.TOP); else { const p = RS_SUIT9[i]; p.forEach((row, j) => [...row].forEach((ch, q) => { if (ch === '#') px(g, '#0e4a2c', x + 11 + q, RS.TOP + 16 + j); })); } }
-  for (let i = 0; i < 7; i++) { const col = rs.tab[i], x = RS.X0 + i * RS.DX; if (!col.length) g.drawImage(RS_SLOT, x, RS.TAB); col.forEach((c, k) => { if (!hidden(c)) g.drawImage(c.up ? RS_FACES[c.s][c.r] : RS_BACK, x, rsColY(col, k)); }); }
+  const suitMark = (i, x) => RS_SUIT9[i].forEach((row, j) => [...row].forEach((ch, q) => { if (ch === '#') px(g, '#0e4a2c', x + 11 + q, RS.TOP + 16 + j); }));
+  const foundAt = (i, x) => { const f = rs.found[i]; g.drawImage(RS_SLOT, x, RS.TOP); const top = f.length && hidden(f[f.length - 1]) ? f[f.length - 2] : f[f.length - 1]; if (top) g.drawImage(RS_FACES[top.s][top.r], x, RS.TOP); else suitMark(i, x); };
+  if (v === 'fc') {
+    for (let i = 0; i < 4; i++) { g.drawImage(RS_SLOT, rsX(i), RS.TOP); const c = rs.cells[i]; if (c && !hidden(c)) g.drawImage(RS_FACES[c.s][c.r], rsX(i), RS.TOP); }
+    for (let i = 0; i < 4; i++) foundAt(i, rsX(4 + i));
+  } else if (rsSpider()) {
+    g.drawImage(rs.stock.length ? RS_BACK : RS_SLOT, rsX(0), RS.TOP); if (rs.stock.length) pxFont(g, String(rs.stock.length / 10), rsX(0) + 15, RS.TOP + 24, '#ffd84a', 7, 'center');
+    for (let i = 0; i < 8; i++) { const x = rsX(2 + i), s = rs.done[i]; if (s == null) g.drawImage(RS_SLOT, x, RS.TOP); else g.drawImage(RS_FACES[s][12], x, RS.TOP); }
+  } else {
+    g.drawImage(rs.stock.length ? RS_BACK : RS_SLOT, rsX(0), RS.TOP); if (!rs.stock.length) { px(g, '#0e4a2c', rsX(0) + 11, RS.TOP + 16, 8, 8); px(g, '#156a3e', rsX(0) + 13, RS.TOP + 18, 4, 4); }
+    const ws = rs.waste.slice(rss.draw3 ? -3 : -1); ws.forEach((c, k) => { if (!hidden(c)) g.drawImage(RS_FACES[c.s][c.r], rsX(1) + k * (rss.draw3 ? 6 : 0), RS.TOP); });
+    for (let i = 0; i < 4; i++) foundAt(i, rsX(3 + i));
+  }
+  for (let i = 0; i < rs.tab.length; i++) { const col = rs.tab[i], x = rsX(i); if (!col.length) g.drawImage(RS_SLOT, x, RS.TAB); col.forEach((c, k) => { if (!hidden(c)) g.drawImage(c.up ? RS_FACES[c.s][c.r] : RS_BACK, x, rsColY(col, k)); }); }
   if (dragging) dragging.cards.forEach((c, k) => { px(g, 'rgba(0,0,0,.3)', dragging.x - dragging.ox + 3, dragging.y - dragging.oy + k * 12 + 3, RS.CW, RS.CH); g.drawImage(RS_FACES[c.s][c.r], Math.round(dragging.x - dragging.ox), Math.round(dragging.y - dragging.oy + k * 12)); });
-  pxFont(g, clock(rs.mode === 'won' ? rs.time : (Date.now() - rs.t0) / 1000) + ' · ' + rs.moves + ' coups', W - 6, H - 4, '#a8e0b8', 6, 'right');
-  if (rs.mode === 'won' && rs.tick - rs.wonAt > 30) gameText(g, W, [['RÉUSSIE !', '#ffd84a', 14], [clock(rs.time) + ' · ' + rs.moves + ' coups', '#ffffff'], ['Clic pour une nouvelle donne', '#a8e0b8']], 110);
+  if (rs.bounce) rsBounce();
+  pxFont(g, rsG().name + ' · ' + clock(rs.mode === 'won' ? rs.time : (Date.now() - rs.t0) / 1000) + ' · ' + rs.moves + (rs.moves > 1 ? ' coups' : ' coup'), W - 6, H - 4, '#a8e0b8', 6, 'right');
+  if (rs.mode === 'won' && rs.tick - rs.wonAt > 150) gameText(g, W, [['RÉUSSIE !', '#ffd84a', 14], [clock(rs.time) + ' · ' + rs.moves + (rs.moves > 1 ? ' coups' : ' coup'), '#ffffff'], ['Clic pour une nouvelle donne', '#a8e0b8']], 110);
+}
+// la victoire : les cartes partent une à une et rebondissent sur le bas de l'écran, en laissant leur trace
+function rsBounce() {
+  const B = rs.bounce, age = rs.tick - rs.wonAt;
+  if (age % 7 === 0 && age < 140 && B.length < 18) { const s = B.length % 4, r = 12 - Math.floor(B.length / 4) % 13; B.push({x: rsX(rss.v === 'fc' ? 4 + s : rsSpider() ? 2 + (B.length % 8) : 3 + s), y: RS.TOP, vx: (Math.random() < .5 ? -1 : 1) * (1.2 + Math.random() * 1.6), vy: -Math.random() * 2, s: rsSpider() ? (rs.done[B.length % 8] ?? 2) : s, r}); }
+  for (const c of B) { if (c.x < -RS.CW || c.x > W) continue; c.vy += .35; c.x += c.vx; c.y += c.vy; if (c.y > H - RS.CH) { c.y = H - RS.CH; c.vy *= -.72; } }
+  if (!rs.trail) rs.trail = cnv(W, H, () => {}); const tg = rs.trail.getContext('2d'); if (age % 2 === 0) for (const c of B) if (c.x > -RS.CW && c.x < W) tg.drawImage(RS_FACES[c.s][c.r], Math.round(c.x), Math.round(c.y));
+  g.drawImage(rs.trail, 0, 0); for (const c of B) if (c.x > -RS.CW && c.x < W) g.drawImage(RS_FACES[c.s][c.r], Math.round(c.x), Math.round(c.y));
 }
 cv.onpointerdown = e => {
-  e.preventDefault(); if (!rs) return; if (rs.mode === 'won') { if (rs.tick - rs.wonAt > 30) { rss.games++; rsNew(); } return; }
+  e.preventDefault(); if (!rs) return; if (rs.mode === 'won') { if (rs.tick - rs.wonAt > 30) { rsStat().games++; rsNew(); } return; }
   const [x, y] = cpos(e), p = rsPick(x, y); if (!p) return;
   if (p.kind === 'stock') return rsStock();
-  const cy = p.kind === 'tab' ? rsColY(rs.tab[p.i], rs.tab[p.i].length - p.cards.length) : RS.TOP, cx = p.kind === 'tab' ? RS.X0 + p.i * RS.DX : p.kind === 'waste' ? RS.X0 + RS.DX + (rss.draw3 ? Math.max(0, Math.min(2, rs.waste.length - 1)) * 6 : 0) : RS.X0 + (3 + p.i) * RS.DX;
+  const cy = p.kind === 'tab' ? rsColY(rs.tab[p.i], rs.tab[p.i].length - p.cards.length) : RS.TOP, cx = p.kind === 'tab' ? rsX(p.i) : p.kind === 'waste' ? rsX(1) + (rss.draw3 ? Math.max(0, Math.min(2, rs.waste.length - 1)) * 6 : 0) : p.kind === 'cell' ? rsX(p.i) : rsX((rss.v === 'fc' ? 4 : 3) + p.i);
   rs.drag = {...p, from: {kind: p.kind, i: p.i}, x, y, ox: x - cx, oy: y - cy, sx: x, sy: y, moved: false}; cv.setPointerCapture(e.pointerId);
 };
 cv.onpointermove = e => { if (!rs?.drag) return; const [x, y] = cpos(e); rs.drag.x = x; rs.drag.y = y; if (Math.hypot(x - rs.drag.sx, y - rs.drag.sy) > 3) rs.drag.moved = true; };
@@ -439,15 +510,40 @@ cv.onpointerup = e => {
   if (!d.moved) { if (!rsAutoMove(d.cards, d.from)) beep(140, .05); return; }
   const to = rsDrop(d.x - d.ox + RS.CW / 2, d.y - d.oy + 6); if (!to || !rsPlace(d.cards, d.from, to)) beep(140, .05);
 };
-function rsInfo() { showStats([['Réussites', rss.wins + ' / ' + Math.max(rss.games, rss.wins)], ['Meilleur temps', rss.bestTime ? clock(rss.bestTime) : '-']]); $('rsDraw3').checked = rss.draw3; }
-$('rsDraw3').onchange = () => { rss.draw3 = $('rsDraw3').checked; saveGames(); rss.games++; rsNew(); };
+const RS_RULES = {
+  k: 'Colonnes : une carte se pose sur une carte d’une unité plus forte et de l’autre couleur (un 7 rouge sur un 8 noir). Une colonne vide n’accepte qu’un Roi. Familles (en haut à droite) : de l’As au Roi, dans la même couleur. Quand tout est découvert, le jeu termine tout seul.',
+  fc: 'Toutes les cartes sont visibles. En colonne : une unité plus faible, de l’autre couleur. Les 4 cases libres (en haut à gauche) gardent une carte chacune ; on déplace d’un bloc autant de cartes que les cases et colonnes vides le permettent. Familles en haut à droite, de l’As au Roi. Presque toutes les donnes se gagnent.',
+  s1: 'Deux jeux, une seule couleur. Une carte se pose sur une carte d’une unité plus forte ; on déplace d’un bloc une suite de la même couleur. Une suite complète du Roi à l’As s’en va. Le talon (en haut à gauche) donne une carte à chaque colonne, quand aucune n’est vide.',
+  s2: 'Deux jeux, deux couleurs (pique et cœur). Une carte se pose sur une carte d’une unité plus forte, de n’importe quelle couleur, mais on ne déplace d’un bloc qu’une suite de la même couleur. Une suite complète du Roi à l’As s’en va. Le talon donne une carte à chaque colonne, quand aucune n’est vide.'};
+function rsInfo() { const S = rsStat(); showStats([['Réussites (' + rsG().name + ')', S.wins + ' / ' + Math.max(S.games, S.wins)], ['Meilleur temps', S.bestTime ? clock(S.bestTime) : '-']]); $('rsDraw3').checked = rss.draw3;
+  $('rsVar').value = rss.v; $('rsDraw3Row').style.display = rss.v === 'k' ? '' : 'none'; $('rsRules').textContent = RS_RULES[rss.v]; }
+$('rsVar').onchange = () => { rss.v = RS_V[$('rsVar').value] ? $('rsVar').value : 'k'; rsStat().games++; saveGames(); rsNew(); $('rsVar').blur(); };
+$('rsDraw3').onchange = () => { rss.draw3 = $('rsDraw3').checked; saveGames(); rsStat().games++; rsNew(); };
 $('rsUndo').onclick = () => { rsUndo(); $('rsUndo').blur(); };
-$('gNew').onclick = () => { rss.games++; saveGames(); rsNew(); $('gNew').blur(); };
-{  // vérification : 52 cartes toutes différentes, 28 en colonnes ; règles des familles et des colonnes
-  const keep = rs; rs = null; rsNew(); const all = [...rs.stock, ...rs.tab.flat()], ids = new Set(all.map(c => c.s * 13 + c.r));
-  console.assert(all.length === 52 && ids.size === 52 && rs.tab.flat().length === 28 && rsCanFound({s: 2, r: 0}, []) && !rsCanFound({s: 2, r: 1}, []) && rsCanTab({s: 0, r: 5}, [{s: 2, r: 6, up: true}]) && !rsCanTab({s: 0, r: 5}, [{s: 1, r: 6, up: true}]) && rsCanTab({s: 3, r: 12}, []), 'réussite');
-  rs = keep;
+$('gNew').onclick = () => { rsStat().games++; saveGames(); rsNew(); $('gNew').blur(); };
+function rsCheck() {  // vérification : les donnes des trois réussites, les règles de chacune, la suite complète de Spider qui s'en va
+  const keep = rs, kv = rss.v, ks = JSON.stringify(rss.sv), kw = [rss.games, rss.wins, rss.bestTime], bad = [], vol = actx; actx = {currentTime: 0, createOscillator: () => { throw 0; }};
+  try {
+    rss.v = 'k'; rs = null; rsNew(); const all = [...rs.stock, ...rs.tab.flat()], ids = new Set(all.map(c => c.s * 13 + c.r));
+    if (!(all.length === 52 && ids.size === 52 && rs.tab.flat().length === 28 && rsCanFound({s: 2, r: 0}, []) && !rsCanFound({s: 2, r: 1}, []) && rsCanTab({s: 0, r: 5}, [{s: 2, r: 6, up: true}]) && !rsCanTab({s: 0, r: 5}, [{s: 1, r: 6, up: true}]) && rsCanTab({s: 3, r: 12}, []))) bad.push('klondike');
+    rss.v = 'fc'; rsNew(); if (rs.tab.flat().length !== 52 || new Set(rs.tab.flat().map(c => c.s * 13 + c.r)).size !== 52 || rs.tab[0].length !== 7 || rs.tab[7].length !== 6 || !rs.tab.flat().every(c => c.up)) bad.push('donne freecell');
+    if (rsFcMax(false) !== 5) bad.push('freecell : 5 cartes d’un coup');
+    rs.tab = [[{s: 2, r: 7, up: true}], [{s: 0, r: 6, up: true}, {s: 3, r: 5, up: true}], [], [], [], [], [], []];  // 6 colonnes vides : beaucoup de cartes d'un coup
+    if (!rsPlace(rs.tab[1].slice(), {kind: 'tab', i: 1}, {kind: 'tab', i: 0}) || rs.tab[0].length !== 3) bad.push('freecell : bloc');
+    if (!rsPlace(rs.tab[0].slice(-1), {kind: 'tab', i: 0}, {kind: 'cell', i: 0}) || !rs.cells[0] || rsFits([{s: 1, r: 1, up: true}], {kind: 'cell', i: 0})) bad.push('freecell : case libre');
+    rss.v = 's2'; rsNew(); if (rs.tab.flat().length !== 54 || rs.stock.length !== 50 || rs.tab[0].length !== 6 || rs.tab[9].length !== 5 || new Set([...rs.stock, ...rs.tab.flat()].map(c => c.s)).size !== 2) bad.push('donne spider');
+    rsStock(); if (rs.stock.length !== 40 || !rs.tab.every(c => c.at(-1).up)) bad.push('spider : talon');
+    const run = RS_RANK.map((_, r) => ({s: 0, r: 12 - r, up: true})); rs.tab[3] = [{s: 2, r: 4, up: false}, ...run.slice(0, 12)]; rs.tab[4].push(run[12]);
+    if (!rsPlace([run[12]], {kind: 'tab', i: 4}, {kind: 'tab', i: 3}) || rs.done.length !== 1 || rs.tab[3].length !== 1 || !rs.tab[3][0].up) bad.push('spider : suite complète');
+    if (rsRun([{s: 0, r: 5, up: true}, {s: 2, r: 4, up: true}])) bad.push('spider : deux couleurs d’un bloc');
+    rs.done = [0, 0, 0, 0, 2, 2, 2]; rs.tab[5] = [...RS_RANK.map((_, r) => ({s: 2, r: 12 - r, up: true}))]; rsAfter(); if (rs.mode !== 'won' || !rs.bounce) bad.push('spider : victoire');
+    for (let i = 0; i < 40; i++) { rs.tick++; rsBounce(); } if (!rs.bounce.length) bad.push('rebonds');
+  } catch (e) { bad.push('erreur ' + e.message); }
+  actx = vol; rs = keep; rss.v = kv; rss.sv = JSON.parse(ks); [rss.games, rss.wins, rss.bestTime] = kw;
+  return bad.length ? bad.join(', ') : 'ok';
 }
+{ const c = rsCheck(); console.assert(c === 'ok', 'réussite', c); cv.dataset.selfcheck = c; }
+cv.__rs = {st: () => rs, rss: () => rss, check: rsCheck, X: rsX, colY: rsColY, RS};
 $('rsFs').onclick = () => { $('rsFs').blur(); try { document.fullscreenElement ? document.exitFullscreen() : cv.parentElement.requestFullscreen?.().catch(() => {}); } catch {} };
 ctx.onOpen(() => { if (!rs) rsNew(); gameLoop(rs, 'reussite', () => {}, rsDraw); rsInfo(); });
 

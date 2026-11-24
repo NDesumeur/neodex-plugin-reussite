@@ -4,6 +4,10 @@ Le solitaire classique (Klondike) : range les 52 cartes dans les quatre familles
 
 *English version: [README.en.md](README.en.md)*
 
+## FreeCell et Spider (nouveau en 1.2.0)
+
+Deux nouvelles réussites à côté du Klondike : FreeCell (8 colonnes, 4 cases libres) et Spider en une ou deux couleurs, chacune avec ses records. À la victoire, les cartes partent en rebondissant.
+
 ## La mise en place
 
 - Sept **colonnes** de 1 à 7 cartes ; seule la dernière de chacune est retournée.
