@@ -300,6 +300,9 @@ export default async function (ctx) {
   const saveGames = () => { clearTimeout(gamesTimer); gamesTimer = setTimeout(() => { gamesTimer = null; folder.write('games', games).catch(() => {}); }, 500); };
   const best = (k, v) => { const b = games.best[k]; if (b == null || v > b) { games.best[k] = v; saveGames(); return true; } return false; };
   const gstore = (k, init) => (games[k] ??= init);
+  // les trophées de NeoDex (3.4.8 et plus) : succès et records déclarés dans plugin.json ; sur un NeoDex plus ancien, rien ne se passe
+  const trophy = id => { ctx.games?.unlock(id).catch(() => {}); };
+  const trophyRecord = (id, v) => { if (v != null && Number.isFinite(+v)) ctx.games?.record(id, +v).catch(() => {}); };
 function gameLoop(st, appKey, update, draw) {
   cancelAnimationFrame(st.raf);
   const STEP = 1000 / 60; let acc = 0, last = performance.now();
@@ -515,7 +518,8 @@ const RS_RULES = {
   fc: 'Toutes les cartes sont visibles. En colonne : une unité plus faible, de l’autre couleur. Les 4 cases libres (en haut à gauche) gardent une carte chacune ; on déplace d’un bloc autant de cartes que les cases et colonnes vides le permettent. Familles en haut à droite, de l’As au Roi. Presque toutes les donnes se gagnent.',
   s1: 'Deux jeux, une seule couleur. Une carte se pose sur une carte d’une unité plus forte ; on déplace d’un bloc une suite de la même couleur. Une suite complète du Roi à l’As s’en va. Le talon (en haut à gauche) donne une carte à chaque colonne, quand aucune n’est vide.',
   s2: 'Deux jeux, deux couleurs (pique et cœur). Une carte se pose sur une carte d’une unité plus forte, de n’importe quelle couleur, mais on ne déplace d’un bloc qu’une suite de la même couleur. Une suite complète du Roi à l’As s’en va. Le talon donne une carte à chaque colonne, quand aucune n’est vide.'};
-function rsInfo() { const S = rsStat(); showStats([['Réussites (' + rsG().name + ')', S.wins + ' / ' + Math.max(S.games, S.wins)], ['Meilleur temps', S.bestTime ? clock(S.bestTime) : '-']]); $('rsDraw3').checked = rss.draw3;
+function rsInfo() {
+  setTimeout(rsTrophies); const S = rsStat(); showStats([['Réussites (' + rsG().name + ')', S.wins + ' / ' + Math.max(S.games, S.wins)], ['Meilleur temps', S.bestTime ? clock(S.bestTime) : '-']]); $('rsDraw3').checked = rss.draw3;
   $('rsVar').value = rss.v; $('rsDraw3Row').style.display = rss.v === 'k' ? '' : 'none'; $('rsRules').textContent = RS_RULES[rss.v]; }
 $('rsVar').onchange = () => { rss.v = RS_V[$('rsVar').value] ? $('rsVar').value : 'k'; rsStat().games++; saveGames(); rsNew(); $('rsVar').blur(); };
 $('rsDraw3').onchange = () => { rss.draw3 = $('rsDraw3').checked; saveGames(); rsStat().games++; rsNew(); };
@@ -545,6 +549,14 @@ function rsCheck() {  // vérification : les donnes des trois réussites, les r�
 { const c = rsCheck(); console.assert(c === 'ok', 'réussite', c); cv.dataset.selfcheck = c; }
 cv.__rs = {st: () => rs, rss: () => rss, check: rsCheck, X: rsX, colY: rsColY, RS};
 $('rsFs').onclick = () => { $('rsFs').blur(); try { document.fullscreenElement ? document.exitFullscreen() : cv.parentElement.requestFullscreen?.().catch(() => {}); } catch {} };
+// les trophées, tirés des statistiques et des records gardés (aussi à l'ouverture : ce qui a été fait avant compte)
+function rsTrophies() {
+  const k = rss, fc = rss.sv.fc || {}, s1 = rss.sv.s1 || {}, s2 = rss.sv.s2 || {}, sp = [s1.bestTime, s2.bestTime].filter(Boolean);
+  const sig = [k.wins, k.bestTime, fc.wins, s1.wins, s2.wins].join(); if (sig === rsTrophies.sig) return; rsTrophies.sig = sig;
+  trophyRecord('klondike', k.bestTime || null); trophyRecord('freecell', fc.bestTime || null); trophyRecord('spider', sp.length ? Math.min(...sp) : null);
+  if (k.wins >= 1) trophy('premier'); if (k.wins >= 10) trophy('dix'); if (k.wins >= 50) trophy('cinquante'); if (k.bestTime && k.bestTime < 180) trophy('rapide');
+  if (fc.wins >= 1) trophy('freecell'); if (s1.wins >= 1 || s2.wins >= 1) trophy('spider'); if (s2.wins >= 1) trophy('spider2');
+}
 ctx.onOpen(() => { if (!rs) rsNew(); gameLoop(rs, 'reussite', () => {}, rsDraw); rsInfo(); });
 
 }

@@ -1,7 +1,7 @@
 {
   "id": "neodex.reussite",
   "name": "Réussite",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "author": "NDesumeur",
   "description": "Le solitaire classique (Klondike) : range les 52 cartes dans les quatre familles de l'As au Roi en les déplaçant entre sept colonnes, par ordre décroissant et couleurs alternées. Glisse les cartes ou clique pour les envoyer à la meilleure place, pioche une ou trois cartes, annule sans limite ; fin automatique, temps, coups et meilleur temps gardés. Un bouton met le jeu en plein écran, et la table grandit avec la fenêtre. Aussi FreeCell et Spider (une ou deux couleurs), et les cartes qui rebondissent à la victoire.",
   "icon": "icon.png",
@@ -22,5 +22,63 @@
   "sdk": "2.1.0",
   "permissions": [
     "storage"
+  ],
+  "succes": [
+    {
+      "id": "premier",
+      "nom": "Réussite !",
+      "texte": "Gagner une première partie de Klondike"
+    },
+    {
+      "id": "dix",
+      "nom": "Patience",
+      "texte": "Gagner 10 parties de Klondike"
+    },
+    {
+      "id": "cinquante",
+      "nom": "Grande patience",
+      "texte": "Gagner 50 parties de Klondike"
+    },
+    {
+      "id": "rapide",
+      "nom": "Mains agiles",
+      "texte": "Gagner au Klondike en moins de 3 minutes"
+    },
+    {
+      "id": "freecell",
+      "nom": "FreeCell",
+      "texte": "Gagner une partie de FreeCell"
+    },
+    {
+      "id": "spider",
+      "nom": "L'araignée",
+      "texte": "Gagner une partie de Spider"
+    },
+    {
+      "id": "spider2",
+      "nom": "Araignée à deux couleurs",
+      "texte": "Gagner au Spider à deux couleurs",
+      "cache": true
+    }
+  ],
+  "records": [
+    {
+      "id": "klondike",
+      "nom": "Klondike",
+      "sens": "bas",
+      "format": "temps"
+    },
+    {
+      "id": "freecell",
+      "nom": "FreeCell",
+      "sens": "bas",
+      "format": "temps"
+    },
+    {
+      "id": "spider",
+      "nom": "Spider",
+      "sens": "bas",
+      "format": "temps"
+    }
   ]
 }

@@ -82,5 +82,19 @@
  "spider : deux couleurs d’un bloc": "spider: two suits as a block",
  "spider : victoire": "spider: win",
  "rebonds": "bounces",
- "Le solitaire classique (Klondike) : range les 52 cartes dans les quatre familles de l'As au Roi en les déplaçant entre sept colonnes, par ordre décroissant et couleurs alternées. Glisse les cartes ou clique pour les envoyer à la meilleure place, pioche une ou trois cartes, annule sans limite ; fin automatique, temps, coups et meilleur temps gardés. Un bouton met le jeu en plein écran, et la table grandit avec la fenêtre. Aussi FreeCell et Spider (une ou deux couleurs), et les cartes qui rebondissent à la victoire.": "Classic solitaire (Klondike): sort the 52 cards into the four foundations from Ace to King by moving them between seven columns, in descending order and alternating colours. Drag cards or click to send them to the best place, draw one or three cards, undo without limit; automatic finish, time, moves and best time kept. A button switches the game to full screen, and the table grows with the window. Also FreeCell and Spider (one or two suits), and bouncing cards when you win."
+ "Le solitaire classique (Klondike) : range les 52 cartes dans les quatre familles de l'As au Roi en les déplaçant entre sept colonnes, par ordre décroissant et couleurs alternées. Glisse les cartes ou clique pour les envoyer à la meilleure place, pioche une ou trois cartes, annule sans limite ; fin automatique, temps, coups et meilleur temps gardés. Un bouton met le jeu en plein écran, et la table grandit avec la fenêtre. Aussi FreeCell et Spider (une ou deux couleurs), et les cartes qui rebondissent à la victoire.": "Classic solitaire (Klondike): sort the 52 cards into the four foundations from Ace to King by moving them between seven columns, in descending order and alternating colours. Drag cards or click to send them to the best place, draw one or three cards, undo without limit; automatic finish, time, moves and best time kept. A button switches the game to full screen, and the table grows with the window. Also FreeCell and Spider (one or two suits), and bouncing cards when you win.",
+ "Réussite !": "Solitaire!",
+ "Gagner une première partie de Klondike": "Win your first game of Klondike",
+ "Patience": "Patience",
+ "Gagner 10 parties de Klondike": "Win 10 games of Klondike",
+ "Grande patience": "Great patience",
+ "Gagner 50 parties de Klondike": "Win 50 games of Klondike",
+ "Mains agiles": "Nimble hands",
+ "Gagner au Klondike en moins de 3 minutes": "Win at Klondike in under 3 minutes",
+ "Gagner une partie de FreeCell": "Win a game of FreeCell",
+ "L'araignée": "The spider",
+ "Gagner une partie de Spider": "Win a game of Spider",
+ "Araignée à deux couleurs": "Two-colour spider",
+ "Gagner au Spider à deux couleurs": "Win at two-colour Spider",
+ "Spider": "Spider"
 }
